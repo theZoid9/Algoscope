@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#09111f" />
+    <title>AlgoScope — Visual data structures and algorithms</title>
+    <meta name="description" content="Explore arrays, linked lists, stacks, queues, and algorithms in animated 2D and 3D. Follow code, recursive calls, and execution traces one step at a time." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="compact.css" />
+    <link rel="stylesheet" href="theme.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a href="#top" class="brand" aria-label="AlgoScope home"><span class="brand-orbit"><i></i><b></b></span><span>algo<span>scope</span></span></a>
+        <div class="view-switch" aria-label="Node appearance"><button type="button" id="compactView" aria-pressed="false">2D boxes</button><button type="button" id="spatialView" class="active" aria-pressed="true">3D boxes</button></div>
+        <button type="button" id="themeToggle" aria-label="Switch to light theme" aria-pressed="false" title="Switch to light theme"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M8.5 14.5a6 6 0 1 1 7 0c-.9.7-1.5 1.5-1.5 2.5h-4c0-1-.6-1.8-1.5-2.5Z"/></svg></button>
+      </header>
+
+      <main id="top">
+        <section class="intro" id="visualizer">
+          <div>
+            <p class="eyebrow">Learn by following each step</p>
+            <h1>See algorithms <em>unfold.</em></h1>
+            <p class="intro-copy">Explore data structures in 2D and 3D. Follow each operation, code line, and recursive call as it happens.</p>
+          </div>
+          <div class="complexity-chip"><span>Selected method</span><strong id="complexityValue">O(1)</strong><small id="complexityLabel">at the tail</small></div>
+        </section>
+
+        <section class="lab-grid">
+          <aside class="control-panel" aria-label="Linked list controls">
+            <div class="panel-heading"><p class="eyebrow">Your experiment</p><h2>Build &amp; explore</h2></div>
+            <label class="value-field" for="valueInput"><span>Value</span><input id="valueInput" type="number" inputmode="numeric" min="0" max="999" value="72" aria-label="Node value" /></label>
+            <div class="preset-picker"><span>Collection preset</span><div role="tablist" aria-label="Collection behavior"><button type="button" class="active" id="listPreset" role="tab" aria-selected="true">List</button><button type="button" id="stackPreset" role="tab" aria-selected="false">Stack</button><button type="button" id="queuePreset" role="tab" aria-selected="false">Queue</button></div><p id="presetDescription">Flexible node operations and one-way traversal.</p></div>
+            <div class="algorithm-picker"><span>Algorithm presets</span><div role="tablist" aria-label="Algorithm visualizations"><button type="button" class="active" id="noAlgorithm" role="tab" aria-selected="true">None</button><button type="button" id="twoPointersAlgorithm" role="tab" aria-selected="false">2 ptr</button><button type="button" id="windowAlgorithm" role="tab" aria-selected="false">Window</button><button type="button" id="binaryAlgorithm" role="tab" aria-selected="false">Binary</button><button type="button" id="recursionAlgorithm" role="tab" aria-selected="false">Recursion</button><button type="button" id="fibonacciAlgorithm" role="tab" aria-selected="false">Fibonacci</button></div><label id="algorithmParameter" hidden><span id="algorithmParameterLabel">Target</span><input id="algorithmInput" type="number" inputmode="numeric" value="78" /></label><p id="algorithmDescription">Choose an algorithm to turn the nodes into an interactive search walkthrough.</p></div>
+            <div class="data-structure-picker" id="algorithmStructure" hidden><div class="data-structure-head"><span>Walk through on</span><small>Changes the scene and code</small></div><div role="tablist" aria-label="Algorithm data structure"><button type="button" id="algorithmArray" role="tab" aria-selected="false"><b>▦ Array</b><small>indexed access</small></button><button type="button" class="active" id="algorithmLinkedList" role="tab" aria-selected="true"><b>⇄ Linked list</b><small>follow pointers</small></button></div><p id="algorithmStructureDescription">Nodes remain connected; the matching pointer-based implementation is shown below.</p></div>
+            <div class="method-grid">
+              <button type="button" class="method-button active" data-method="append"><span class="method-icon">↳</span><span><b>Append</b><small>add to tail</small></span><code>O(1)</code></button>
+              <button type="button" class="method-button" data-method="prepend"><span class="method-icon">↰</span><span><b>Prepend</b><small>add to head</small></span><code>O(1)</code></button>
+              <button type="button" class="method-button" data-method="insert"><span class="method-icon">⊕</span><span><b>Insert after</b><small>selected node</small></span><code>O(1)</code></button>
+              <button type="button" class="method-button" data-method="delete"><span class="method-icon">⊖</span><span><b>Delete</b><small>selected node</small></span><code>O(n)</code></button>
+              <button type="button" class="method-button" data-method="find"><span class="method-icon">⌕</span><span><b>Find</b><small>by value</small></span><code>O(n)</code></button>
+              <button type="button" class="method-button" data-method="reverse"><span class="method-icon">⇄</span><span><b>Reverse</b><small>all pointers</small></span><code>O(n)</code></button>
+            </div>
+            <button type="button" class="step-toggle" id="stepToggle" aria-pressed="false"><span class="step-toggle-icon">≡</span><span><b>Step-by-step mode</b><small>Pause on each algorithm step</small></span><i aria-hidden="true"></i></button>
+            <div class="stepper" id="stepper" hidden aria-live="polite">
+              <div class="stepper-top"><span id="stepCount">Step 1 of 1</span><button type="button" id="exitSteps" aria-label="Exit step-by-step mode">×</button></div>
+              <p id="stepDescription"></p>
+              <div class="stepper-actions"><button type="button" id="previousStep" class="stepper-back">← Back</button><button type="button" id="nextStep" class="stepper-next">Next →</button></div>
+            </div>
+            <button type="button" class="run-button" id="runMethod"><span id="runIcon">↳</span><span id="runLabel">Append 72</span><kbd>Enter</kbd></button>
+            <button type="button" class="reset-button" id="resetList">Reset example list</button>
+          </aside>
+
+          <section class="scene-panel" aria-label="Three dimensional linked list scene">
+            <div class="scene-topline"><div><span class="scene-kicker" id="structureType">Singly linked list</span><strong id="listSummary">4 nodes · head → tail</strong></div><div class="scene-utilities"><div class="structure-mode" role="tablist" aria-label="Linked list type"><button class="active" id="singleMode" type="button" role="tab" aria-selected="true">Singly</button><button id="doubleMode" type="button" role="tab" aria-selected="false">Doubly</button></div><div class="scene-help"><span>Drag to orbit</span><i></i><span>Click a node to select</span></div></div></div>
+            <div id="scene" aria-label="Interactive 3D linked list visualization"></div>
+            <div class="camera-tools" id="cameraTools" hidden aria-label="3D camera controls"><button type="button" id="zoomIn" aria-label="Zoom in">+</button><button type="button" id="zoomOut" aria-label="Zoom out">−</button><button type="button" id="fitScene">Fit all</button></div>
+            <div id="flatScene" hidden><div id="flatStatus" role="status" aria-live="polite">Ready to explore</div><div id="flatNodes" aria-label="Interactive two dimensional structure"></div><p id="flatStep" aria-live="polite">Select a method, then run or step through it.</p></div>
+            <div class="scene-bottomline"><div class="legend"><span><i class="legend-head"></i>Head</span><span><i class="legend-node"></i>Node</span><span><i class="legend-link"></i>next pointer</span><span id="prevLegend" hidden><i class="legend-prev"></i>prev pointer</span><span><i class="legend-tail"></i>Null</span></div><span id="selectionHint">Node 15 is selected</span></div>
+          </section>
+        </section>
+
+        <section class="methods-grid" id="methods">
+          <article class="code-panel">
+            <div class="code-head"><div class="function-heading"><p class="eyebrow">How it works</p><h2 id="methodTitle">append(value)</h2></div><div class="function-meta"><span class="language-pill">JavaScript</span><span id="currentCodeLine" class="current-code-line" role="status">Ready</span></div></div>
+            <div class="code-window"><div class="code-lines" id="codeLines"></div></div>
+            <p class="method-explanation" id="methodExplanation"></p>
+            <div class="structure-note" id="structureNote"><span>→</span><p><b>Singly linked:</b> each node stores one <code>next</code> pointer. Moving backward requires a new traversal from the head.</p></div>
+          </article>
+          <article class="activity-panel">
+            <div class="activity-head"><div><p class="eyebrow">Execution trace</p><h2>Follow the progress</h2></div><span class="trace-live"><i></i>Live</span></div>
+            <ol class="trace-list" id="traceList" aria-live="polite"></ol>
+            <div class="tip"><span>✦</span><p><b>Tip:</b> Select a node in the scene before using <strong>insert after</strong> or <strong>delete</strong>.</p></div>
+          </article>
+        </section>
+      </main>
+      <footer><span>AlgoScope</span><p>Data structures and algorithms, one clear step at a time.</p></footer>
+    </div>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
+        }
+      }
+    </script>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

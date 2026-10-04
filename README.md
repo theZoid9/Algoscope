@@ -4,7 +4,28 @@ An interactive learning app for arrays, linked lists, stacks, queues, and algori
 
 ## Run it
 
-Open `index.html` in a current desktop browser with an internet connection. Three.js loads from the jsDelivr CDN; no build step or backend is needed.
+Use Node.js 24 LTS and npm. From this directory:
+
+```sh
+npm ci
+npm run dev
+```
+
+Open the URL printed by Vite. The migrated app requires HTTP; do not open the root `index.html` as a file. Dependencies are package-managed, not loaded from a Three.js CDN. Fonts remain an optional Google Fonts request.
+
+For a production preview:
+
+```sh
+npm test
+npm run build
+npm run preview
+```
+
+Preview normally runs at `http://127.0.0.1:4173/`. Deploy the contents of `dist/` to a static host. No backend is required. The native Vite config loader uses Node's TypeScript support. In the restricted Windows Codex environment, the development dependency prebundler can fail with an ancestor-directory access error; the production build and preview are verified alternatives.
+
+## Migration documentation
+
+See [migration journal](docs/MIGRATION.md) for stages, decisions, verification and limitations, and [architecture guide](docs/ARCHITECTURE.md) for the state contract and extension workflow. The previous static app is preserved under `legacy/`; its original entry can still be opened directly with internet access for its CDN dependencies. Root `app.js` is retained for comparison but is no longer the active entry.
 
 ## Explore
 

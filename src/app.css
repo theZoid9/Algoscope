@@ -1,0 +1,33 @@
+.react-flat-scene { padding:28px 20px; min-height:300px; display:flex; flex-direction:column; justify-content:center; min-width:0; }
+.node-sequence { display:flex; flex-wrap:wrap; gap:24px 0; align-items:center; justify-content:center; }
+.node-sequence.vertical { flex-direction:column; gap:0; }
+.node-slot { display:flex; align-items:center; }
+.vertical .node-slot { flex-direction:column; }
+.react-node { width:66px; min-height:60px; border-radius:10px; border:1px solid #8479d2; background:#29254f; color:#f1efff; animation:node-enter .3s ease; transition:background .25s,box-shadow .25s; }
+.react-node strong { display:block; font:22px DM Mono,monospace; }
+.react-node small { display:block; font:9px DM Mono,monospace; margin-top:7px; }
+.react-node.selected { border-color:#48e3c1; }
+.react-node.active-step { background:#473a80; box-shadow:0 0 0 4px #9b90ff55; }
+.react-arrow { width:34px; text-align:center; color:#48e3c1; font-size:22px; }
+.scene-instruction { color:#b2c2da; line-height:1.7; font-size:12px; margin-top:24px; }
+.validation-message { color:#f4b2a8; font-size:12px; line-height:1.5; }
+.scene-loading { display:grid; place-items:center; min-height:300px; color:#aaa4dc; }
+.react-three-scene { height:340px; min-width:0; position:relative; }
+.react-three-scene canvas { touch-action:none; }
+.three-overlays { position:absolute; inset:0; pointer-events:none; z-index:2; }
+.three-label { pointer-events:none; color:#f8f8ff; font:600 20px DM Mono,monospace; text-align:center; text-shadow:0 1px 3px #000; }
+.three-label small { display:block; font-size:9px; margin-top:5px; }
+.three-tag { color:#d4fff4; background:#154737; padding:4px 7px; border-radius:4px; font:10px DM Mono,monospace; white-space:nowrap; pointer-events:none; }
+.three-label .node-heading, .three-label .node-current { position:absolute; left:50%; transform:translateX(-50%); }
+.three-label .node-heading { bottom:calc(100% + 14px); }
+.three-label .node-current { top:calc(100% + 14px); }
+.camera-tools { bottom:10px; }
+body.compact .scene-panel { grid-template-rows:auto minmax(300px,1fr) auto; }
+body.compact .lab-grid, body.compact .scene-panel { min-width:0; }
+body.light-theme .react-node { background:#e9e3fc; color:#3e3265; border-color:#a497ce; }
+body.light-theme .react-node.active-step { background:#dacefa; }
+body.light-theme .react-arrow { color:#087e68; }
+body.light-theme .scene-instruction { color:#415976; }
+body.light-theme .validation-message { color:#a52920; }
+@keyframes node-enter { from{opacity:.3;transform:translateY(8px)}to{opacity:1;transform:translateY(0)} }
+@media(prefers-reduced-motion:reduce){.react-node{animation:none;transition:none}}

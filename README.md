@@ -1,6 +1,6 @@
-# LinkLab — Three.js linked list visualizer
+# AlgoScope — Visual data structures and algorithms
 
-A self-contained, desktop-style web app that turns a singly linked list into an interactive 3D scene.
+An interactive learning app for arrays, linked lists, stacks, queues, and algorithms. Switch between animated 2D nodes and Three.js boxes while following the code and execution trace. Guided recursion and Fibonacci lessons walk through every call and return.
 
 ## Run it
 
@@ -19,3 +19,4 @@ Open `index.html` in a current desktop browser with an internet connection. Thre
 - **Fibonacci** remains scalar (`n = 4`) and shows `0 → 1 → 1 → 2 → 3` as its fixed resulting sequence.
 - Watch nodes move and pointers redraw after each mutation.
 - Read the corresponding JavaScript method and execution trace.
+- All collections support up to 10 nodes. Stack and Queue use singly linked nodes. Switch between light and dark themes with the bulb button.

@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#09111f" />
-    <title>LinkLab — 3D linked list visualizer</title>
+    <title>AlgoScope — Visual data structures and algorithms</title>
+    <meta name="description" content="Explore arrays, linked lists, stacks, queues, and algorithms in animated 2D and 3D. Follow code, recursive calls, and execution traces one step at a time." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -15,7 +16,7 @@
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <a href="#top" class="brand" aria-label="LinkLab home"><span class="brand-orbit"><i></i><b></b></span><span>link<span>lab</span></span></a>
+        <a href="#top" class="brand" aria-label="AlgoScope home"><span class="brand-orbit"><i></i><b></b></span><span>algo<span>scope</span></span></a>
         <div class="view-switch" aria-label="Node appearance"><button type="button" id="compactView" aria-pressed="false">2D boxes</button><button type="button" id="spatialView" class="active" aria-pressed="true">3D boxes</button></div>
         <button type="button" id="themeToggle" aria-label="Switch to light theme" aria-pressed="false" title="Switch to light theme"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M9 18h6M10 21h4M8.5 14.5a6 6 0 1 1 7 0c-.9.7-1.5 1.5-1.5 2.5h-4c0-1-.6-1.8-1.5-2.5Z"/></svg></button>
       </header>
@@ -23,16 +24,16 @@
       <main id="top">
         <section class="intro" id="visualizer">
           <div>
-            <p class="eyebrow">Data structures, made spatial</p>
-            <h1>Follow every <em>link.</em></h1>
-            <p class="intro-copy">Build a singly linked list, then see precisely how each method changes its nodes and pointers in 3D.</p>
+            <p class="eyebrow">Learn by following each step</p>
+            <h1>See algorithms <em>unfold.</em></h1>
+            <p class="intro-copy">Explore data structures in 2D and 3D. Follow each operation, code line, and recursive call as it happens.</p>
           </div>
           <div class="complexity-chip"><span>Selected method</span><strong id="complexityValue">O(1)</strong><small id="complexityLabel">at the tail</small></div>
         </section>
 
         <section class="lab-grid">
           <aside class="control-panel" aria-label="Linked list controls">
-            <div class="panel-heading"><p class="eyebrow">List controls</p><h2>Manipulate nodes</h2></div>
+            <div class="panel-heading"><p class="eyebrow">Your experiment</p><h2>Build &amp; explore</h2></div>
             <label class="value-field" for="valueInput"><span>Value</span><input id="valueInput" type="number" inputmode="numeric" min="0" max="999" value="72" aria-label="Node value" /></label>
             <div class="preset-picker"><span>Collection preset</span><div role="tablist" aria-label="Collection behavior"><button type="button" class="active" id="listPreset" role="tab" aria-selected="true">List</button><button type="button" id="stackPreset" role="tab" aria-selected="false">Stack</button><button type="button" id="queuePreset" role="tab" aria-selected="false">Queue</button></div><p id="presetDescription">Flexible node operations and one-way traversal.</p></div>
             <div class="algorithm-picker"><span>Algorithm presets</span><div role="tablist" aria-label="Algorithm visualizations"><button type="button" class="active" id="noAlgorithm" role="tab" aria-selected="true">None</button><button type="button" id="twoPointersAlgorithm" role="tab" aria-selected="false">2 ptr</button><button type="button" id="windowAlgorithm" role="tab" aria-selected="false">Window</button><button type="button" id="binaryAlgorithm" role="tab" aria-selected="false">Binary</button><button type="button" id="recursionAlgorithm" role="tab" aria-selected="false">Recursion</button><button type="button" id="fibonacciAlgorithm" role="tab" aria-selected="false">Fibonacci</button></div><label id="algorithmParameter" hidden><span id="algorithmParameterLabel">Target</span><input id="algorithmInput" type="number" inputmode="numeric" value="78" /></label><p id="algorithmDescription">Choose an algorithm to turn the nodes into an interactive search walkthrough.</p></div>
@@ -72,13 +73,13 @@
             <div class="structure-note" id="structureNote"><span>→</span><p><b>Singly linked:</b> each node stores one <code>next</code> pointer. Moving backward requires a new traversal from the head.</p></div>
           </article>
           <article class="activity-panel">
-            <div class="activity-head"><div><p class="eyebrow">Execution trace</p><h2>What just happened</h2></div><span class="trace-live"><i></i>Live</span></div>
+            <div class="activity-head"><div><p class="eyebrow">Execution trace</p><h2>Follow the progress</h2></div><span class="trace-live"><i></i>Live</span></div>
             <ol class="trace-list" id="traceList" aria-live="polite"></ol>
             <div class="tip"><span>✦</span><p><b>Tip:</b> Select a node in the scene before using <strong>insert after</strong> or <strong>delete</strong>.</p></div>
           </article>
         </section>
       </main>
-      <footer><span>LinkLab</span><p>A visual playground for the mechanics behind linked lists.</p></footer>
+      <footer><span>AlgoScope</span><p>Data structures and algorithms, one clear step at a time.</p></footer>
     </div>
     <div id="toast" role="status" aria-live="polite"></div>
     <script type="importmap">

@@ -106,6 +106,16 @@ const algorithmVariants = {
     title: "binarySearch(target)", complexity: "O(log n)", complexityLabel: "sorted values", icon: "⌕",
     explanation: "Repeatedly inspect the midpoint of a sorted sequence, discarding the half that cannot contain the target.",
     code: ["<span class='token-key'>function</span> <span class='token-method'>binarySearch</span>(values, target) {", "  <span class='token-key'>let</span> low = 0, high = values.length - 1;", "  <span class='token-key'>while</span> (low &lt;= high) {", "    <span class='token-key'>const</span> mid = Math.floor((low + high) / 2);", "    <span class='token-key'>if</span> (values[mid] === target) <span class='token-key'>return</span> mid;", "    values[mid] &lt; target ? low = mid + 1 : high = mid - 1;", "  }", "}"], active: [1, 2, 3, 4, 5]
+  },
+  recursiveSum: {
+    title: "sumFrom(node)", complexity: "O(n)", complexityLabel: "call stack", icon: "↴",
+    explanation: "A fixed four-node list makes each recursive call visible: follow next until null, then add values while the calls return.",
+    code: ["<span class='token-key'>function</span> <span class='token-method'>sumFrom</span>(node) {", "  <span class='token-key'>if</span> (!node) <span class='token-key'>return</span> 0;", "  <span class='token-key'>const</span> rest = sumFrom(node.next);", "  <span class='token-key'>return</span> node.value + rest;", "}"], active: [0, 1, 2, 3]
+  },
+  fibonacci: {
+    title: "fibonacci(n)", complexity: "O(2ⁿ)", complexityLabel: "recursive tree", icon: "⌁",
+    explanation: "Trace a deliberately small Fibonacci tree for n = 4. The fixed list below holds the completed sequence: 0, 1, 1, 2, 3.",
+    code: ["<span class='token-key'>function</span> <span class='token-method'>fibonacci</span>(n) {", "  <span class='token-key'>if</span> (n &lt; 2) <span class='token-key'>return</span> n;", "  <span class='token-key'>const</span> left = fibonacci(n - 1);", "  <span class='token-key'>const</span> right = fibonacci(n - 2);", "  <span class='token-key'>return</span> left + right;", "}"], active: [0, 1, 2, 3, 4]
   }
 };
 
@@ -356,6 +366,8 @@ function algorithmRole(index) {
     if (index === algorithmState.low) return "low";
     if (index === algorithmState.high) return "high";
   }
+  if (algorithmMode === "recursiveSum" && index === algorithmState.activeIndex) return algorithmState.phase === "return" ? "return" : "call";
+  if (algorithmMode === "fibonacci" && index === algorithmState.activeN) return algorithmState.lastEvent?.type === "return" ? "return" : "call";
   return null;
 }
 
@@ -365,6 +377,13 @@ function addAlgorithmMarker(index, text, color, background, height = 1.15) {
   marker.position.copy(positionFor(index, list.length)).add(new THREE.Vector3(0, height, .1));
   marker.scale.multiplyScalar(.72);
   algorithmLayer.add(marker);
+}
+
+function addAlgorithmBanner(text, color = "#e6e2ff", background = "#332d64", height = 2.15) {
+  const banner = makeLabel(text, color, background, 16);
+  banner.position.set(0, height, .15);
+  banner.scale.multiplyScalar(.64);
+  algorithmLayer.add(banner);
 }
 
 function renderAlgorithmOverlay() {
@@ -398,6 +417,22 @@ function renderAlgorithmOverlay() {
     addAlgorithmMarker(algorithmState.high, "HIGH", "#2a1504", "#f6b862");
     addAlgorithmMarker(algorithmState.mid, algorithmState.found === algorithmState.mid ? "FOUND" : "MID", algorithmState.found === algorithmState.mid ? "#07231d" : "#1e153d", algorithmState.found === algorithmState.mid ? "#48e3c1" : "#c0b5ff", 1.52);
   }
+  if (algorithmMode === "recursiveSum") {
+    const returning = algorithmState.phase === "return";
+    addAlgorithmMarker(algorithmState.activeIndex, returning ? "RETURN" : "CALL", returning ? "#09251e" : "#1e153d", returning ? "#78ffe4" : "#c0b5ff", 1.52);
+    const stack = algorithmState.callStack.map(index => `sum(${list[index]?.value ?? "null"})`).join(" → ");
+    addAlgorithmBanner(stack ? `CALL STACK  ${stack}` : algorithmState.done ? `TOTAL = ${algorithmState.total}` : "CALL STACK  base case: null");
+    if (returning && algorithmState.activeIndex != null) addAlgorithmBanner(`${list[algorithmState.activeIndex].value} + rest = ${algorithmState.returns[algorithmState.activeIndex]}`, "#d8fff7", "#174d45", 1.62);
+  }
+  if (algorithmMode === "fibonacci") {
+    const event = algorithmState.lastEvent;
+    addAlgorithmMarker(algorithmState.activeN, event?.type === "return" ? "RETURN" : "CALL", event?.type === "return" ? "#09251e" : "#1e153d", event?.type === "return" ? "#78ffe4" : "#c0b5ff", 1.52);
+    list.forEach((_, index) => addAlgorithmMarker(index, `F${index}`, "#c9d0e8", "#28384f", -.98));
+    const stack = algorithmState.callStack.map(value => `f${value}`).join(" → ");
+    const status = event?.type === "return" ? `RETURN fib(${event.n}) = ${event.value}` : `CALL fib(${algorithmState.activeN})`;
+    addAlgorithmBanner(`${status}  ·  ${stack || "start"}`);
+    if (algorithmState.done) addAlgorithmBanner("fibonacci(4) = 3", "#d8fff7", "#174d45", 1.62);
+  }
 }
 
 function updateSelectionVisuals() {
@@ -405,7 +440,7 @@ function updateSelectionVisuals() {
     const index = list.findIndex(item => item.id === id);
     const role = algorithmRole(index);
     const selected = id === selectedId;
-    const styles = { left: [0x236ea9, 0x0a2c45, 0x77c7ff], right: [0xb7661e, 0x4e2408, 0xf6b862], window: [0x685cae, 0x2b2853, 0xc0b5ff], low: [0x236ea9, 0x0a2c45, 0x77c7ff], high: [0xb7661e, 0x4e2408, 0xf6b862], mid: [0x685cae, 0x2b2853, 0xc0b5ff], found: [0x168e7d, 0x0a5249, 0x78ffe4] };
+    const styles = { left: [0x236ea9, 0x0a2c45, 0x77c7ff], right: [0xb7661e, 0x4e2408, 0xf6b862], window: [0x685cae, 0x2b2853, 0xc0b5ff], low: [0x236ea9, 0x0a2c45, 0x77c7ff], high: [0xb7661e, 0x4e2408, 0xf6b862], mid: [0x685cae, 0x2b2853, 0xc0b5ff], found: [0x168e7d, 0x0a5249, 0x78ffe4], call: [0x685cae, 0x2b2853, 0xc0b5ff], return: [0x168e7d, 0x0a5249, 0x78ffe4] };
     const style = styles[role] || (selected ? [0x168e7d, 0x0a5249, 0x78ffe4] : [0x544ca0, 0x161332, 0xa198ff]);
     group.userData.box.material.color.set(style[0]);
     group.userData.box.material.emissive.set(style[1]);
@@ -444,7 +479,8 @@ function selectNode(id) {
 function updateCopy() {
   const direction = listMode === "doubly" ? "⇄" : "→";
   const labels = collectionMode === "stack" ? `top ${direction} base · LIFO` : collectionMode === "queue" ? `front ${direction} rear · FIFO` : `head ${direction} tail`;
-  document.getElementById("listSummary").textContent = list.length ? `${list.length} node${list.length === 1 ? "" : "s"} · ${labels}` : `Empty ${collectionMode === "stack" ? "stack" : collectionMode === "queue" ? "queue" : "list"} · null`;
+  const lesson = algorithmMode === "recursiveSum" ? "fixed recursive sum" : algorithmMode === "fibonacci" ? "fixed Fibonacci sequence" : labels;
+  document.getElementById("listSummary").textContent = list.length ? `${list.length} node${list.length === 1 ? "" : "s"} · ${lesson}` : `Empty ${collectionMode === "stack" ? "stack" : collectionMode === "queue" ? "queue" : "list"} · null`;
   if (!list.some(item => item.id === selectedId)) selectedId = list[0]?.id || null;
   selectNode(selectedId);
 }
@@ -459,7 +495,7 @@ function getMethodDisplay(name = selectedMethod) {
 function updateStructureNote() {
   const note = document.getElementById("structureNote");
   if (algorithmMode !== "none") {
-    const algorithmDetails = algorithmMode === "twoPointers" ? "The values are sorted first; L and R close in according to whether their sum is too small or too large." : algorithmMode === "slidingWindow" ? "The highlighted window stays contiguous and advances by one node each run." : "The values are sorted first; each comparison discards half of the remaining candidates.";
+    const algorithmDetails = algorithmMode === "twoPointers" ? "The values are sorted first; L and R close in according to whether their sum is too small or too large." : algorithmMode === "slidingWindow" ? "The highlighted window stays contiguous and advances by one node each run." : algorithmMode === "binarySearch" ? "The values are sorted first; each comparison discards half of the remaining candidates." : algorithmMode === "recursiveSum" ? "A fixed list of 4 → 7 → 2 → 6 exposes the descent to null and the values returning up the call stack." : "A fixed sequence of 0 → 1 → 1 → 2 → 3 anchors the small recursive call tree for fibonacci(4).";
     note.innerHTML = `<span>✦</span><p><b>Algorithm view:</b> ${algorithmDetails}</p>`;
     return;
   }
@@ -473,7 +509,8 @@ function updateStructureNote() {
 
 function updateStructureHeader() {
   const collection = collectionMode === "stack" ? "Stack · " : collectionMode === "queue" ? "Queue · " : "";
-  document.getElementById("structureType").textContent = `${collection}${listMode === "doubly" ? "doubly" : "singly"} linked`;
+  const lesson = algorithmMode === "recursiveSum" ? "Recursion demo · " : algorithmMode === "fibonacci" ? "Fibonacci demo · " : "";
+  document.getElementById("structureType").textContent = `${lesson}${collection}${listMode === "doubly" ? "doubly" : "singly"} linked`;
 }
 
 function updatePresetControls() {
@@ -520,24 +557,49 @@ function setCollectionMode(mode) {
 
 function updateAlgorithmControls() {
   const metadata = {
-    none: ["Choose an algorithm to turn the nodes into an interactive search walkthrough.", "", ""],
-    twoPointers: ["Sorted values; move L/R toward a target sum.", "Target sum", 78],
-    slidingWindow: ["Slide a fixed-size, contiguous window through the nodes.", "Window size", 2],
-    binarySearch: ["Sorted values; repeatedly halve the search range.", "Target value", 46]
+    none: { description: "Choose an algorithm to turn the nodes into an interactive search walkthrough.", parameter: false },
+    twoPointers: { description: "Sorted values; move L/R toward a target sum.", label: "Target sum", value: 78, parameter: true },
+    slidingWindow: { description: "Slide a fixed-size, contiguous window through the nodes.", label: "Window size", value: 2, parameter: true },
+    binarySearch: { description: "Sorted values; repeatedly halve the search range.", label: "Target value", value: 46, parameter: true },
+    recursiveSum: { description: "Fixed list 4 → 7 → 2 → 6; descend through next, then return the total.", parameter: false },
+    fibonacci: { description: "Fixed n = 4 call tree, with 0 → 1 → 1 → 2 → 3 shown as a basic sequence.", parameter: false }
   }[algorithmMode];
-  [["noAlgorithm", "none"], ["twoPointersAlgorithm", "twoPointers"], ["windowAlgorithm", "slidingWindow"], ["binaryAlgorithm", "binarySearch"]].forEach(([id, mode]) => {
+  [["noAlgorithm", "none"], ["twoPointersAlgorithm", "twoPointers"], ["windowAlgorithm", "slidingWindow"], ["binaryAlgorithm", "binarySearch"], ["recursionAlgorithm", "recursiveSum"], ["fibonacciAlgorithm", "fibonacci"]].forEach(([id, mode]) => {
     const button = document.getElementById(id);
     const selected = mode === algorithmMode;
     button.classList.toggle("active", selected);
     button.setAttribute("aria-selected", String(selected));
   });
-  document.getElementById("algorithmDescription").textContent = metadata[0];
+  document.getElementById("algorithmDescription").textContent = metadata.description;
   const parameter = document.getElementById("algorithmParameter");
-  parameter.hidden = algorithmMode === "none";
-  if (algorithmMode !== "none") {
-    document.getElementById("algorithmParameterLabel").textContent = metadata[1];
-    document.getElementById("algorithmInput").value = metadata[2];
+  parameter.hidden = !metadata.parameter;
+  if (metadata.parameter) {
+    document.getElementById("algorithmParameterLabel").textContent = metadata.label;
+    document.getElementById("algorithmInput").value = metadata.value;
   }
+}
+
+const fixedAlgorithmValues = {
+  recursiveSum: [4, 7, 2, 6],
+  fibonacci: [0, 1, 1, 2, 3]
+};
+
+function buildFibonacciEvents(n) {
+  const events = [];
+  function visit(value, depth) {
+    events.push({ type: "call", n: value, depth });
+    if (value < 2) {
+      events.push({ type: "return", n: value, value, depth });
+      return value;
+    }
+    const left = visit(value - 1, depth + 1);
+    const right = visit(value - 2, depth + 1);
+    const result = left + right;
+    events.push({ type: "return", n: value, value: result, depth });
+    return result;
+  }
+  visit(n, 0);
+  return events;
 }
 
 function configureAlgorithm() {
@@ -556,6 +618,16 @@ function configureAlgorithm() {
     list.sort((a, b) => a.value - b.value);
     algorithmState = { low: 0, high: list.length - 1, mid: list.length ? Math.floor((list.length - 1) / 2) : null, target: Number.isFinite(supplied) ? supplied : 46, found: null, done: false };
   }
+  if (algorithmMode === "recursiveSum") {
+    list = fixedAlgorithmValues.recursiveSum.map(createNodeData);
+    selectedId = list[0].id;
+    algorithmState = { phase: "call", index: 0, returnIndex: null, total: 0, returns: [], callStack: [], activeIndex: 0, done: false };
+  }
+  if (algorithmMode === "fibonacci") {
+    list = fixedAlgorithmValues.fibonacci.map(createNodeData);
+    selectedId = list[4].id;
+    algorithmState = { events: buildFibonacciEvents(4), cursor: 0, callStack: [], activeN: 4, lastEvent: null, done: false };
+  }
 }
 
 function setAlgorithmMode(mode) {
@@ -571,6 +643,7 @@ function setAlgorithmMode(mode) {
   algorithmState = null;
   updateAlgorithmControls();
   updatePresetControls();
+  updateStructureHeader();
   if (mode !== "none") {
     configureAlgorithm();
     const algorithm = getMethodDisplay();
@@ -634,7 +707,7 @@ function updateRunButton() {
   const button = document.getElementById("runMethod");
   if (algorithmMode !== "none") {
     const algorithm = getMethodDisplay();
-    const directLabel = algorithmState?.done ? "Restart walkthrough" : algorithmMode === "twoPointers" ? "Compare pointers" : algorithmMode === "slidingWindow" ? "Slide window" : "Check midpoint";
+    const directLabel = algorithmState?.done ? "Restart walkthrough" : algorithmMode === "twoPointers" ? "Compare pointers" : algorithmMode === "slidingWindow" ? "Slide window" : algorithmMode === "binarySearch" ? "Check midpoint" : algorithmMode === "recursiveSum" ? algorithmState?.phase === "return" ? "Return a frame" : "Call next node" : "Advance call tree";
     const label = stepSession ? "Walkthrough in progress" : stepMode ? `Walk through: ${directLabel}` : directLabel;
     document.getElementById("runIcon").textContent = algorithm.icon;
     document.getElementById("runLabel").textContent = label;
@@ -766,6 +839,58 @@ function runAlgorithm() {
         algorithmState.mid = low <= algorithmState.high ? Math.floor((low + algorithmState.high) / 2) : null;
         trace(`<b>Midpoint ${value} is too large</b>; discard the upper half.`, "find");
       }
+    }
+  }
+  if (algorithmMode === "recursiveSum") {
+    if (algorithmState.phase === "call") {
+      if (algorithmState.index < list.length) {
+        const index = algorithmState.index;
+        algorithmState.activeIndex = index;
+        algorithmState.callStack.push(index);
+        algorithmState.index += 1;
+        trace(`<b>Call sumFrom(${list[index].value})</b> and follow its next pointer.`, "find");
+        showToast(`Descending into node ${list[index].value}.`);
+      } else {
+        algorithmState.phase = "return";
+        algorithmState.returnIndex = list.length - 1;
+        algorithmState.activeIndex = null;
+        trace("<b>Reached null</b>; the base case returns 0.", "find");
+        showToast("Base case: null returns 0.");
+      }
+    } else {
+      const index = algorithmState.returnIndex;
+      algorithmState.activeIndex = index;
+      algorithmState.total += list[index].value;
+      algorithmState.returns[index] = algorithmState.total;
+      algorithmState.callStack.pop();
+      algorithmState.returnIndex -= 1;
+      trace(`<b>Return ${list[index].value} + rest = ${algorithmState.total}</b>.`, "find");
+      if (algorithmState.returnIndex < 0) {
+        algorithmState.done = true;
+        showToast(`Recursive sum complete: ${algorithmState.total}.`);
+      } else {
+        showToast(`Returning through node ${list[index].value}.`);
+      }
+    }
+  }
+  if (algorithmMode === "fibonacci") {
+    const event = algorithmState.events[algorithmState.cursor];
+    algorithmState.lastEvent = event;
+    algorithmState.activeN = event.n;
+    algorithmState.callStack = event.type === "call"
+      ? [...algorithmState.callStack.slice(0, event.depth), event.n]
+      : algorithmState.callStack.slice(0, event.depth + 1);
+    if (event.type === "call") {
+      trace(`<b>Call fibonacci(${event.n})</b>${event.n < 2 ? " — base case next." : " — split into two smaller calls."}`, "find");
+      showToast(`Call fibonacci(${event.n}).`);
+    } else {
+      trace(`<b>Return fibonacci(${event.n}) = ${event.value}</b>.`, "find");
+      showToast(`Return ${event.value} from fibonacci(${event.n}).`);
+    }
+    algorithmState.cursor += 1;
+    if (algorithmState.cursor >= algorithmState.events.length) {
+      algorithmState.done = true;
+      showToast("Fibonacci walkthrough complete: fibonacci(4) = 3.");
     }
   }
   rebuildScene();
@@ -916,6 +1041,39 @@ function startStepSession(context) {
 function buildAlgorithmSteps() {
   if (!algorithmState) return [];
   if (algorithmState.done) return [{ line: 1, description: "The walkthrough is complete. Applying this step restarts it from the initial pointers." }];
+  if (algorithmMode === "recursiveSum") {
+    if (algorithmState.phase === "call" && algorithmState.index < list.length) {
+      const value = list[algorithmState.index].value;
+      return [
+        { line: 0, description: `Enter sumFrom at node ${value}. This call waits for the rest of the list.` },
+        { line: 1, description: `Node ${value} is not null, so this is not the base case.` },
+        { line: 2, description: `Follow ${value}'s next pointer to create the next recursive frame.` }
+      ];
+    }
+    if (algorithmState.phase === "call") return [
+      { line: 1, description: "There is no node left. The base case returns 0 and the call stack starts unwinding." }
+    ];
+    const value = list[algorithmState.returnIndex].value;
+    const rest = algorithmState.total;
+    return [
+      { line: 3, description: `Resolve this frame: ${value} + ${rest} returns ${value + rest}.` }
+    ];
+  }
+  if (algorithmMode === "fibonacci") {
+    const event = algorithmState.events[algorithmState.cursor];
+    if (event.type === "call") {
+      if (event.n < 2) return [
+        { line: 0, description: `Enter fibonacci(${event.n}).` },
+        { line: 1, description: `${event.n} is a base case, so this frame returns ${event.n}.` }
+      ];
+      return [
+        { line: 0, description: `Enter fibonacci(${event.n}).` },
+        { line: 2, description: `First explore fibonacci(${event.n - 1}), the left branch.` },
+        { line: 3, description: `Then fibonacci(${event.n - 2}) forms the right branch before the parent can return.` }
+      ];
+    }
+    return [{ line: event.n < 2 ? 1 : 4, description: `Return ${event.value} to the caller from fibonacci(${event.n}).` }];
+  }
   if (algorithmMode === "twoPointers") {
     const { left, right, target } = algorithmState;
     if (left >= right) return [{ line: 2, description: "The pointers have met, so no unchecked pair remains." }];
@@ -1040,6 +1198,8 @@ document.getElementById("noAlgorithm").addEventListener("click", () => setAlgori
 document.getElementById("twoPointersAlgorithm").addEventListener("click", () => setAlgorithmMode("twoPointers"));
 document.getElementById("windowAlgorithm").addEventListener("click", () => setAlgorithmMode("slidingWindow"));
 document.getElementById("binaryAlgorithm").addEventListener("click", () => setAlgorithmMode("binarySearch"));
+document.getElementById("recursionAlgorithm").addEventListener("click", () => setAlgorithmMode("recursiveSum"));
+document.getElementById("fibonacciAlgorithm").addEventListener("click", () => setAlgorithmMode("fibonacci"));
 document.getElementById("algorithmInput").addEventListener("change", () => { if (algorithmMode !== "none") { if (stepSession) exitStepSession(); configureAlgorithm(); rebuildScene(); updateRunButton(); } });
 document.getElementById("runMethod").addEventListener("click", runSelectedMethod);
 document.getElementById("stepToggle").addEventListener("click", () => setStepMode(!stepMode));

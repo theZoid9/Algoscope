@@ -119,6 +119,15 @@ const algorithmVariants = {
   }
 };
 
+const recursionVariants = {
+  array: {
+    title: "sumArray(values, index)", complexity: "O(n)", complexityLabel: "indexed recursion", icon: "[]",
+    explanation: "The fixed array [4, 7, 2, 6] advances an index until it reaches the array length, then returns each value into the running total.",
+    code: ["<span class='token-key'>function</span> <span class='token-method'>sumArray</span>(values, index = 0) {", "  <span class='token-key'>if</span> (index === values.length) <span class='token-key'>return</span> 0;", "  <span class='token-key'>const</span> rest = sumArray(values, index + 1);", "  <span class='token-key'>return</span> values[index] + rest;", "}"], active: [0, 1, 2, 3]
+  },
+  linkedList: algorithmVariants.recursiveSum
+};
+
 let nodeSequence = 0;
 let list = starterValues.map(createNodeData);
 let selectedId = list[0].id;
@@ -127,6 +136,7 @@ let listMode = "singly";
 let collectionMode = "list";
 let algorithmMode = "none";
 let algorithmState = null;
+let recursionSource = "linkedList";
 let toastTimer;
 let stepMode = false;
 let stepSession = null;
@@ -244,13 +254,14 @@ function createVisualNode(item) {
   const nextLabel = makeLabel("next", "#a6abc7", "transparent", 18);
   nextLabel.position.set(.47, -.28, .35);
   nextLabel.scale.multiplyScalar(.5);
+  nextLabel.visible = !isArrayRecursionView();
   group.add(nextLabel);
   const prevLabel = makeLabel("prev", "#b6aeff", "transparent", 18);
   prevLabel.position.set(-.47, -.28, .35);
   prevLabel.scale.multiplyScalar(.5);
-  prevLabel.visible = listMode === "doubly";
+  prevLabel.visible = listMode === "doubly" && !isArrayRecursionView();
   group.add(prevLabel);
-  group.userData = { id: item.id, box, rim, prevLabel, target: new THREE.Vector3(), created: performance.now() };
+  group.userData = { id: item.id, box, rim, nextLabel, prevLabel, target: new THREE.Vector3(), created: performance.now() };
   nodeLayer.add(group);
   visualNodes.set(item.id, group);
   clickTargets.push(box);
@@ -271,7 +282,8 @@ function rebuildScene(immediate = false) {
     const group = visualNodes.get(item.id) || createVisualNode(item);
     const target = positionFor(index, list.length);
     group.userData.target.copy(target);
-    group.userData.prevLabel.visible = listMode === "doubly";
+    group.userData.nextLabel.visible = !isArrayRecursionView();
+    group.userData.prevLabel.visible = listMode === "doubly" && !isArrayRecursionView();
     if (immediate) group.position.copy(target);
   });
   rebuildLinks();
@@ -282,17 +294,18 @@ function rebuildScene(immediate = false) {
 
 function syncPointers() {
   list.forEach((node, index) => {
-    node.next = list[index + 1]?.id || null;
-    node.prev = listMode === "doubly" ? list[index - 1]?.id || null : null;
+    node.next = isArrayRecursionView() ? null : list[index + 1]?.id || null;
+    node.prev = !isArrayRecursionView() && listMode === "doubly" ? list[index - 1]?.id || null : null;
   });
 }
 
 function rebuildLinks() {
   linkLayer.clear();
   labelLayer.clear();
+  const arrayView = isArrayRecursionView();
   const nextMaterial = new THREE.MeshStandardMaterial({ color: 0x4ee2c2, emissive: 0x1b7e72, emissiveIntensity: 1, metalness: .25, roughness: .35 });
   const prevMaterial = new THREE.MeshStandardMaterial({ color: 0x9a8cff, emissive: 0x5143ad, emissiveIntensity: 1, metalness: .25, roughness: .35 });
-  for (let index = 0; index < list.length - 1; index++) {
+  if (!arrayView) for (let index = 0; index < list.length - 1; index++) {
     const from = positionFor(index, list.length);
     const to = positionFor(index + 1, list.length);
     const direction = to.clone().sub(from).normalize();
@@ -307,6 +320,18 @@ function rebuildLinks() {
     }
   }
   if (list.length) {
+    if (arrayView) {
+      const arrayLabel = makeLabel("FIXED ARRAY", "#d8d3ff", "#2e2858", 18);
+      arrayLabel.position.set(0, 1.23, .05);
+      arrayLabel.scale.multiplyScalar(.72);
+      labelLayer.add(arrayLabel);
+      list.forEach((_, index) => {
+        const slot = makeLabel(`[${index}]`, "#a9b7cf", "transparent", 16);
+        slot.position.copy(positionFor(index, list.length)).add(new THREE.Vector3(0, -.86, .22));
+        slot.scale.multiplyScalar(.58);
+        labelLayer.add(slot);
+      });
+    } else {
     const headText = collectionMode === "stack" ? "TOP" : collectionMode === "queue" ? "FRONT" : "HEAD";
     const tailText = collectionMode === "stack" ? "BASE" : collectionMode === "queue" ? "REAR" : "TAIL";
     const headOffset = collectionMode === "stack" ? new THREE.Vector3(0, 1.02, 0) : new THREE.Vector3(0, 1.15, 0);
@@ -326,6 +351,7 @@ function rebuildLinks() {
       previousNull.position.copy(positionFor(0, list.length)).add(collectionMode === "stack" ? new THREE.Vector3(0, 1.35, .42) : new THREE.Vector3(-1.58, -.43, 0));
       previousNull.scale.multiplyScalar(.58);
       labelLayer.add(previousNull);
+    }
     }
   } else {
     const empty = makeLabel("head → null", "#9ba9c0", "transparent", 28);
@@ -419,9 +445,11 @@ function renderAlgorithmOverlay() {
   }
   if (algorithmMode === "recursiveSum") {
     const returning = algorithmState.phase === "return";
-    addAlgorithmMarker(algorithmState.activeIndex, returning ? "RETURN" : "CALL", returning ? "#09251e" : "#1e153d", returning ? "#78ffe4" : "#c0b5ff", 1.52);
-    const stack = algorithmState.callStack.map(index => `sum(${list[index]?.value ?? "null"})`).join(" → ");
-    addAlgorithmBanner(stack ? `CALL STACK  ${stack}` : algorithmState.done ? `TOTAL = ${algorithmState.total}` : "CALL STACK  base case: null");
+    const callLabel = isArrayRecursionView() ? "INDEX" : "CALL";
+    addAlgorithmMarker(algorithmState.activeIndex, returning ? "RETURN" : callLabel, returning ? "#09251e" : "#1e153d", returning ? "#78ffe4" : "#c0b5ff", 1.52);
+    const stack = algorithmState.callStack.map(index => isArrayRecursionView() ? `i${index}` : `sum(${list[index]?.value ?? "null"})`).join(" → ");
+    const baseCase = isArrayRecursionView() ? "base case: index = length" : "base case: null";
+    addAlgorithmBanner(stack ? `CALL STACK  ${stack}` : algorithmState.done ? `TOTAL = ${algorithmState.total}` : `CALL STACK  ${baseCase}`);
     if (returning && algorithmState.activeIndex != null) addAlgorithmBanner(`${list[algorithmState.activeIndex].value} + rest = ${algorithmState.returns[algorithmState.activeIndex]}`, "#d8fff7", "#174d45", 1.62);
   }
   if (algorithmMode === "fibonacci") {
@@ -479,13 +507,18 @@ function selectNode(id) {
 function updateCopy() {
   const direction = listMode === "doubly" ? "⇄" : "→";
   const labels = collectionMode === "stack" ? `top ${direction} base · LIFO` : collectionMode === "queue" ? `front ${direction} rear · FIFO` : `head ${direction} tail`;
-  const lesson = algorithmMode === "recursiveSum" ? "fixed recursive sum" : algorithmMode === "fibonacci" ? "fixed Fibonacci sequence" : labels;
+  const lesson = algorithmMode === "recursiveSum" ? recursionSource === "array" ? "fixed recursive array" : "fixed recursive list" : algorithmMode === "fibonacci" ? "fixed Fibonacci sequence" : labels;
   document.getElementById("listSummary").textContent = list.length ? `${list.length} node${list.length === 1 ? "" : "s"} · ${lesson}` : `Empty ${collectionMode === "stack" ? "stack" : collectionMode === "queue" ? "queue" : "list"} · null`;
   if (!list.some(item => item.id === selectedId)) selectedId = list[0]?.id || null;
   selectNode(selectedId);
 }
 
+function isArrayRecursionView() {
+  return algorithmMode === "recursiveSum" && recursionSource === "array";
+}
+
 function getMethodDisplay(name = selectedMethod) {
+  if (algorithmMode === "recursiveSum") return recursionVariants[recursionSource];
   if (algorithmMode !== "none") return algorithmVariants[algorithmMode];
   const structuralMethod = listMode === "doubly" ? { ...methods[name], ...doublyVariants[name] } : methods[name];
   const collectionMethod = collectionMode === "list" ? null : getCollectionVariant(collectionMode, name);
@@ -495,7 +528,7 @@ function getMethodDisplay(name = selectedMethod) {
 function updateStructureNote() {
   const note = document.getElementById("structureNote");
   if (algorithmMode !== "none") {
-    const algorithmDetails = algorithmMode === "twoPointers" ? "The values are sorted first; L and R close in according to whether their sum is too small or too large." : algorithmMode === "slidingWindow" ? "The highlighted window stays contiguous and advances by one node each run." : algorithmMode === "binarySearch" ? "The values are sorted first; each comparison discards half of the remaining candidates." : algorithmMode === "recursiveSum" ? "A fixed list of 4 → 7 → 2 → 6 exposes the descent to null and the values returning up the call stack." : "A fixed sequence of 0 → 1 → 1 → 2 → 3 anchors the small recursive call tree for fibonacci(4).";
+    const algorithmDetails = algorithmMode === "twoPointers" ? "The values are sorted first; L and R close in according to whether their sum is too small or too large." : algorithmMode === "slidingWindow" ? "The highlighted window stays contiguous and advances by one node each run." : algorithmMode === "binarySearch" ? "The values are sorted first; each comparison discards half of the remaining candidates." : algorithmMode === "recursiveSum" ? recursionSource === "array" ? "The fixed array [4, 7, 2, 6] advances an index to its length, then returns values back through the call stack." : "A fixed list of 4 → 7 → 2 → 6 exposes the descent to null and the values returning up the call stack." : "A fixed sequence of 0 → 1 → 1 → 2 → 3 anchors the small recursive call tree for fibonacci(4).";
     note.innerHTML = `<span>✦</span><p><b>Algorithm view:</b> ${algorithmDetails}</p>`;
     return;
   }
@@ -509,7 +542,7 @@ function updateStructureNote() {
 
 function updateStructureHeader() {
   const collection = collectionMode === "stack" ? "Stack · " : collectionMode === "queue" ? "Queue · " : "";
-  const lesson = algorithmMode === "recursiveSum" ? "Recursion demo · " : algorithmMode === "fibonacci" ? "Fibonacci demo · " : "";
+  const lesson = algorithmMode === "recursiveSum" ? recursionSource === "array" ? "Recursion array · " : "Recursion list · " : algorithmMode === "fibonacci" ? "Fibonacci demo · " : "";
   document.getElementById("structureType").textContent = `${lesson}${collection}${listMode === "doubly" ? "doubly" : "singly"} linked`;
 }
 
@@ -576,6 +609,18 @@ function updateAlgorithmControls() {
   if (metadata.parameter) {
     document.getElementById("algorithmParameterLabel").textContent = metadata.label;
     document.getElementById("algorithmInput").value = metadata.value;
+  }
+  const sourceControl = document.getElementById("recursionSource");
+  sourceControl.hidden = algorithmMode !== "recursiveSum";
+  if (algorithmMode === "recursiveSum") {
+    const arraySelected = recursionSource === "array";
+    document.getElementById("recursionArray").classList.toggle("active", arraySelected);
+    document.getElementById("recursionArray").setAttribute("aria-selected", String(arraySelected));
+    document.getElementById("recursionLinkedList").classList.toggle("active", !arraySelected);
+    document.getElementById("recursionLinkedList").setAttribute("aria-selected", String(!arraySelected));
+    document.getElementById("recursionSourceDescription").innerHTML = arraySelected
+      ? "Advance <code>index</code> until it reaches <code>values.length</code>."
+      : "Follow each node’s <code>next</code> pointer until <code>null</code>.";
   }
 }
 
@@ -663,6 +708,21 @@ function setAlgorithmMode(mode) {
     updateStructureNote();
     rebuildScene();
   }
+}
+
+function setRecursionSource(source) {
+  if (source === recursionSource) return;
+  if (stepSession) exitStepSession();
+  recursionSource = source;
+  if (algorithmMode !== "recursiveSum") return;
+  configureAlgorithm();
+  updateAlgorithmControls();
+  updateStructureHeader();
+  updateStructureNote();
+  renderCode(getMethodDisplay());
+  rebuildScene();
+  updateRunButton();
+  showToast(source === "array" ? "Recursion now uses indexed array access." : "Recursion now follows linked-list next pointers.");
 }
 
 function setListMode(mode) {
@@ -848,14 +908,15 @@ function runAlgorithm() {
         algorithmState.activeIndex = index;
         algorithmState.callStack.push(index);
         algorithmState.index += 1;
-        trace(`<b>Call sumFrom(${list[index].value})</b> and follow its next pointer.`, "find");
-        showToast(`Descending into node ${list[index].value}.`);
+        const location = isArrayRecursionView() ? `index ${index} (${list[index].value})` : `node ${list[index].value}`;
+        trace(`<b>Call the next frame at ${location}</b>.`, "find");
+        showToast(isArrayRecursionView() ? `Advance to index ${index}.` : `Descending into node ${list[index].value}.`);
       } else {
         algorithmState.phase = "return";
         algorithmState.returnIndex = list.length - 1;
         algorithmState.activeIndex = null;
-        trace("<b>Reached null</b>; the base case returns 0.", "find");
-        showToast("Base case: null returns 0.");
+        trace(isArrayRecursionView() ? "<b>Reached values.length</b>; the base case returns 0." : "<b>Reached null</b>; the base case returns 0.", "find");
+        showToast(isArrayRecursionView() ? "Base case: index equals array length." : "Base case: null returns 0.");
       }
     } else {
       const index = algorithmState.returnIndex;
@@ -1044,19 +1105,23 @@ function buildAlgorithmSteps() {
   if (algorithmMode === "recursiveSum") {
     if (algorithmState.phase === "call" && algorithmState.index < list.length) {
       const value = list[algorithmState.index].value;
+      const index = algorithmState.index;
+      if (isArrayRecursionView()) return [
+        { line: 0, description: `Enter sumArray with index ${index}; its value is ${value}.` },
+        { line: 1, description: `${index} is smaller than values.length (${list.length}), so this is not the base case.` },
+        { line: 2, description: `Increment the index to ${index + 1} for the next recursive frame.` }
+      ];
       return [
         { line: 0, description: `Enter sumFrom at node ${value}. This call waits for the rest of the list.` },
         { line: 1, description: `Node ${value} is not null, so this is not the base case.` },
         { line: 2, description: `Follow ${value}'s next pointer to create the next recursive frame.` }
       ];
     }
-    if (algorithmState.phase === "call") return [
-      { line: 1, description: "There is no node left. The base case returns 0 and the call stack starts unwinding." }
-    ];
+    if (algorithmState.phase === "call") return [{ line: 1, description: isArrayRecursionView() ? "The index equals values.length. The base case returns 0 and the stack unwinds." : "There is no node left. The base case returns 0 and the call stack starts unwinding." }];
     const value = list[algorithmState.returnIndex].value;
     const rest = algorithmState.total;
     return [
-      { line: 3, description: `Resolve this frame: ${value} + ${rest} returns ${value + rest}.` }
+      { line: 3, description: isArrayRecursionView() ? `Resolve index ${algorithmState.returnIndex}: ${value} + ${rest} returns ${value + rest}.` : `Resolve this frame: ${value} + ${rest} returns ${value + rest}.` }
     ];
   }
   if (algorithmMode === "fibonacci") {
@@ -1200,6 +1265,8 @@ document.getElementById("windowAlgorithm").addEventListener("click", () => setAl
 document.getElementById("binaryAlgorithm").addEventListener("click", () => setAlgorithmMode("binarySearch"));
 document.getElementById("recursionAlgorithm").addEventListener("click", () => setAlgorithmMode("recursiveSum"));
 document.getElementById("fibonacciAlgorithm").addEventListener("click", () => setAlgorithmMode("fibonacci"));
+document.getElementById("recursionArray").addEventListener("click", () => setRecursionSource("array"));
+document.getElementById("recursionLinkedList").addEventListener("click", () => setRecursionSource("linkedList"));
 document.getElementById("algorithmInput").addEventListener("change", () => { if (algorithmMode !== "none") { if (stepSession) exitStepSession(); configureAlgorithm(); rebuildScene(); updateRunButton(); } });
 document.getElementById("runMethod").addEventListener("click", runSelectedMethod);
 document.getElementById("stepToggle").addEventListener("click", () => setStepMode(!stepMode));

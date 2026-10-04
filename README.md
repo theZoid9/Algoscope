@@ -14,6 +14,6 @@ Open `index.html` in a current desktop browser with an internet connection. Thre
 - Switch between **Singly** and **Doubly** linked lists to reveal backward `prev` arrows, compare code, and see the memory-versus-navigation tradeoff.
 - Pick **Stack** for LIFO push/pop at the top, or **Queue** for FIFO enqueue/dequeue from rear to front, using the same node structure.
 - Use **2 ptr**, **Window**, or **Binary** for stepwise algorithm presets with live L/R, window, or low/mid/high markers. Two Pointers and Binary Search sort the visual node order first.
-- Use **Recursion** for a fixed `4 → 7 → 2 → 6` list: it descends through `next`, reaches `null`, then visibly returns the running sum. **Fibonacci** uses a fixed `n = 4` call tree and shows `0 → 1 → 1 → 2 → 3` as the resulting sequence.
+- Use **Recursion** with the fixed values `4, 7, 2, 6`: choose **Array** to recurse with `values[index]`, or **Linked list** to recurse with `node.next`. Each choice presents its own code and visualization. **Fibonacci** uses a fixed `n = 4` call tree and shows `0 → 1 → 1 → 2 → 3` as the resulting sequence.
 - Watch nodes move and pointers redraw after each mutation.
 - Read the corresponding JavaScript method and execution trace.

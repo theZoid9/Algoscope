@@ -167,6 +167,8 @@ let collectionMode = "list";
 let algorithmMode = "none";
 let algorithmState = null;
 let algorithmStructure = "linkedList";
+let compactView = false;
+let sceneLayoutKey = "";
 let toastTimer;
 let stepMode = false;
 let stepSession = null;
@@ -222,8 +224,9 @@ function initScene() {
   controls.enableDamping = true;
   controls.dampingFactor = .07;
   controls.enablePan = false;
-  controls.minDistance = 7;
-  controls.maxDistance = 19;
+  controls.minDistance = 3;
+  controls.maxDistance = 80;
+  controls.zoomSpeed = .7;
   controls.maxPolarAngle = Math.PI * .48;
   controls.minPolarAngle = Math.PI * .18;
   controls.target.set(0, .15, 0);
@@ -245,6 +248,7 @@ function initScene() {
   floor.position.y = -1.35;
   scene.add(floor);
   window.addEventListener("resize", resizeScene);
+  new ResizeObserver(() => resizeScene()).observe(sceneElement);
   renderer.domElement.addEventListener("click", onSceneClick);
   resizeScene();
   rebuildScene(true);
@@ -257,6 +261,33 @@ function resizeScene() {
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
+  fitCamera();
+}
+
+function fitCamera() {
+  if (!camera || !controls || !sceneElement.clientWidth || sceneElement.hidden) return;
+  const first = positionFor(0, Math.max(1, list.length));
+  const last = positionFor(Math.max(0, list.length - 1), Math.max(1, list.length));
+  const center = first.clone().add(last).multiplyScalar(.5);
+  center.y += .5;
+  const spanX = Math.abs(last.x - first.x) + 4;
+  const spanY = Math.abs(last.y - first.y) + 4.5;
+  const vertical = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const distance = Math.max(spanY / (2 * vertical), spanX / (2 * vertical * camera.aspect)) * 1.16;
+  const direction = new THREE.Vector3(0, .25, 1).normalize();
+  controls.target.copy(center);
+  controls.maxDistance = Math.max(80, distance * 2.5);
+  camera.position.copy(center).addScaledVector(direction, distance);
+  camera.far = Math.max(100, distance * 5);
+  camera.updateProjectionMatrix();
+  controls.update();
+}
+
+function zoomCamera(factor) {
+  const offset = camera.position.clone().sub(controls.target);
+  const distance = THREE.MathUtils.clamp(offset.length() * factor, controls.minDistance, controls.maxDistance);
+  camera.position.copy(controls.target).add(offset.normalize().multiplyScalar(distance));
+  controls.update();
 }
 
 function positionFor(index, length) {
@@ -291,7 +322,7 @@ function createVisualNode(item) {
   prevLabel.scale.multiplyScalar(.5);
   prevLabel.visible = listMode === "doubly" && !isArrayAlgorithmView();
   group.add(prevLabel);
-  group.userData = { id: item.id, box, rim, nextLabel, prevLabel, target: new THREE.Vector3(), created: performance.now() };
+  group.userData = { id: item.id, box, rim, valueLabel, nextLabel, prevLabel, target: new THREE.Vector3(), created: performance.now() };
   nodeLayer.add(group);
   visualNodes.set(item.id, group);
   clickTargets.push(box);
@@ -320,6 +351,12 @@ function rebuildScene(immediate = false) {
   updateSelectionVisuals();
   renderAlgorithmOverlay();
   updateCopy();
+  renderFlatScene();
+  const layoutKey = `${list.length}:${collectionMode}`;
+  if (layoutKey !== sceneLayoutKey) {
+    sceneLayoutKey = layoutKey;
+    fitCamera();
+  }
 }
 
 function syncPointers() {
@@ -513,6 +550,16 @@ function renderScene(time) {
     const selected = id === selectedId;
     group.position.y = group.userData.target.y + (selected ? Math.sin(seconds * 3.4) * .09 + .07 : 0);
     group.rotation.y = selected ? Math.sin(seconds * 2.4) * .04 : 0;
+    // Sprite text faces the viewer; move it to the visible side of the box too.
+    group.updateWorldMatrix(true, false);
+    const localViewer = group.worldToLocal(camera.position.clone());
+    const backFacing = localViewer.z < 0;
+    const faceDepth = backFacing ? -.35 : .35;
+    group.userData.valueLabel.position.z = faceDepth;
+    group.userData.nextLabel.position.z = faceDepth;
+    group.userData.prevLabel.position.z = faceDepth;
+    group.userData.nextLabel.position.x = backFacing ? -.47 : .47;
+    group.userData.prevLabel.position.x = backFacing ? .47 : -.47;
   });
   controls.update();
   renderer.render(scene, camera);
@@ -532,6 +579,91 @@ function selectNode(id) {
   updateSelectionVisuals();
   const node = list.find(item => item.id === id);
   document.getElementById("selectionHint").textContent = node ? `Node ${node.value} is selected` : "No node selected";
+  if (compactView) renderFlatScene();
+}
+
+function setCompactView(enabled) {
+  const limit = 10;
+  if (list.length > limit) {
+    showToast(`Remove nodes until this ${collectionMode} has ${limit} or fewer before switching views.`);
+    return;
+  }
+  compactView = true;
+  const stepper = document.getElementById("stepper");
+  document.querySelector(".code-window").after(stepper);
+  document.body.classList.add("compact");
+  document.body.classList.remove("dimensional-boxes");
+  document.getElementById("scene").hidden = enabled;
+  document.getElementById("flatScene").hidden = !enabled;
+  document.getElementById("cameraTools").hidden = enabled;
+  updatePresetControls();
+  [["compactView", enabled], ["spatialView", !enabled]].forEach(([id, active]) => {
+    const button = document.getElementById(id);
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  renderer.setAnimationLoop(enabled ? null : renderScene);
+  if (enabled) renderFlatScene();
+  else {
+    rebuildScene(true);
+    requestAnimationFrame(resizeScene);
+  }
+}
+
+function renderFlatScene() {
+  if (!compactView) return;
+  const container = document.getElementById("flatNodes");
+  const width = container.clientWidth || 300;
+  const stack = collectionMode === "stack";
+  const columns = stack ? 1 : Math.max(1, Math.floor(width / 100));
+  const rows = Math.max(1, Math.ceil(list.length / columns));
+  container.style.height = `${Math.max(160, rows * 92)}px`;
+  const ids = new Set(list.map(node => node.id));
+  container.querySelectorAll(".flat-node").forEach(button => { if (!ids.has(button.dataset.id)) button.remove(); });
+  const positions = list.map((node, index) => {
+    const row = Math.floor(index / columns);
+    const count = Math.min(columns, list.length - row * columns);
+    return { x: (width - count * 92) / 2 + (index % columns) * 92 + 15, y: row * 92 + 22 };
+  });
+  list.forEach((node, index) => {
+    let button = [...container.querySelectorAll(".flat-node")].find(element => element.dataset.id === node.id);
+    if (!button) {
+      button = document.createElement("button");
+      button.type = "button";
+      button.dataset.id = node.id;
+      button.className = "flat-node entering";
+      button.addEventListener("click", () => selectNode(node.id));
+      container.appendChild(button);
+    }
+    const role = algorithmRole(index);
+    const step = stepSession?.steps[stepSession.current];
+    const focus = stepSession && (algorithmMode === "recursiveSum" ? algorithmState.phase === "call" ? algorithmState.index : algorithmState.returnIndex : list.findIndex(item => item.id === selectedId));
+    button.classList.toggle("selected", node.id === selectedId);
+    button.classList.toggle("active-step", Boolean(role) || Boolean(stepSession && index === focus));
+    button.dataset.role = role || "";
+    button.style.left = `${positions[index].x}px`;
+    button.style.top = `${positions[index].y}px`;
+    button.innerHTML = `${node.value}<small>${role ? role.toUpperCase() : isArrayAlgorithmView() ? `[${index}]` : index === 0 ? stack ? "TOP" : "HEAD" : index === list.length - 1 ? "TAIL" : "NODE"}</small>`;
+    button.setAttribute("aria-label", `${isArrayAlgorithmView() ? `Index ${index}` : `Node ${index + 1}`}, value ${node.value}${role ? `, ${role}` : ""}`);
+    if (step) { button.classList.remove("step-pulse"); void button.offsetWidth; if (index === focus || role) button.classList.add("step-pulse"); }
+  });
+  let links = container.querySelector("svg");
+  if (!links) { links = document.createElementNS("http://www.w3.org/2000/svg", "svg"); links.classList.add("flat-links"); links.setAttribute("aria-hidden", "true"); container.prepend(links); }
+  links.setAttribute("viewBox", `0 0 ${width} ${Math.max(160, rows * 92)}`);
+  let paths = '<defs><marker id="flatArrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" style="fill:#48e3c1;stroke:none"/></marker></defs>';
+  if (!isArrayAlgorithmView()) positions.slice(0, -1).forEach((from, index) => {
+    const to = positions[index + 1];
+    const sameRow = from.y === to.y;
+    const x1 = from.x + (sameRow ? 62 : 31), y1 = from.y + (sameRow ? 23 : 54);
+    const x2 = to.x + (sameRow ? 0 : 31), y2 = to.y + (sameRow ? 23 : 0);
+    paths += `<path d="M${x1},${y1} L${x2},${y2}" marker-end="url(#flatArrow)"/>`;
+    if (listMode === "doubly") paths += `<path class="prev" d="M${x2},${y2 + 9} L${x1},${y1 + 9}" marker-end="url(#flatArrow)"/>`;
+  });
+  links.innerHTML = paths;
+  const state = algorithmState;
+  const status = algorithmMode === "recursiveSum" ? `Call stack: ${state.callStack.map(index => isArrayAlgorithmView() ? `i${index}` : `sum(${list[index].value})`).join(" → ") || "empty"} · returned sum ${state.total}` : algorithmMode === "fibonacci" ? `Call stack: ${state.callStack.map(n => `fib(${n})`).join(" → ") || "ready"}` : algorithmMode === "slidingWindow" ? `Window ${state.start + 1}–${state.start + state.size} · best ${Number.isFinite(state.best) ? state.best : "—"}` : `${isArrayAlgorithmView() ? "Array" : collectionMode === "stack" ? "Stack · LIFO" : collectionMode === "queue" ? "Queue · FIFO" : "Linked list"} · ${list.length} values`;
+  document.getElementById("flatStatus").textContent = status;
+  document.getElementById("flatStep").textContent = stepSession ? stepSession.steps[stepSession.current].description : state?.done ? "Walkthrough complete. Run again to restart." : "Select a node, then run or step through the operation.";
 }
 
 function updateCopy() {
@@ -591,6 +723,8 @@ function updatePresetControls() {
     button.querySelector("code").textContent = values[3];
   });
   document.getElementById("presetDescription").textContent = options.description;
+  const limit = getCollectionLimit();
+  if (Number.isFinite(limit)) document.getElementById("presetDescription").textContent += ` Up to ${limit} nodes in this view. Remove nodes to make space.`;
   document.querySelectorAll(".method-button").forEach(button => {
     const allowed = algorithmMode === "none" && (collectionMode === "list" || ["append", "delete"].includes(button.dataset.method));
     button.disabled = !allowed;
@@ -598,11 +732,19 @@ function updatePresetControls() {
 }
 
 function setCollectionMode(mode) {
+  const limit = 10;
+  if (list.length > limit) {
+    showToast(`This preset supports ${limit} nodes in the current view. Delete some list nodes first.`);
+    return;
+  }
   if (mode === collectionMode && algorithmMode === "none") return;
   if (algorithmMode !== "none") setAlgorithmMode("none");
   if (mode === collectionMode) return;
   if (stepSession) exitStepSession();
   collectionMode = mode;
+  document.getElementById("doubleMode").disabled = mode !== "list";
+  document.getElementById("doubleMode").title = mode !== "list" ? "Doubly mode is available for linked lists" : "";
+  if (mode !== "list" && listMode !== "singly") setListMode("singly");
   ["list", "stack", "queue"].forEach(name => {
     const button = document.getElementById(`${name}Preset`);
     const selected = name === mode;
@@ -760,12 +902,18 @@ function setAlgorithmStructure(source) {
   updateStructureHeader();
   updateStructureNote();
   renderCode(getMethodDisplay());
+  const display = getMethodDisplay();
+  document.getElementById("methodTitle").textContent = display.title;
+  document.getElementById("methodExplanation").textContent = display.explanation;
+  document.getElementById("complexityValue").textContent = display.complexity;
+  document.getElementById("complexityLabel").textContent = display.complexityLabel;
   rebuildScene();
   updateRunButton();
   showToast(source === "array" ? "Array view: code and scene now use indexes." : "Linked-list view: code and scene now use pointers.");
 }
 
 function setListMode(mode) {
+  if (collectionMode !== "list" && mode === "doubly") return;
   if (algorithmMode === "twoPointers" && algorithmStructure === "linkedList" && mode === "singly") {
     showToast("Linked-list two pointers uses prev, so Doubly mode stays active.");
     return;
@@ -803,14 +951,37 @@ function selectMethod(name) {
   updateRunButton();
 }
 
-function renderCode(method = getMethodDisplay(), activeLines = method.active) {
-  document.getElementById("codeLines").innerHTML = method.code.map((line, index) => `<div class="code-line ${activeLines.includes(index) ? "active" : ""}"><span class="code-number">${index + 1}</span><code>${line}</code></div>`).join("");
+function renderCode(method = getMethodDisplay(), activeLines = []) {
+  const current = activeLines.length ? activeLines[activeLines.length - 1] : null;
+  const lines = document.getElementById("codeLines");
+  lines.innerHTML = method.code.map((line, index) => `<div class="code-line ${index === current ? "active" : ""}" ${index === current ? 'aria-current="step"' : ""}><span class="code-number">${index === current ? "▶ " : ""}${index + 1}</span><code>${line}</code></div>`).join("");
+  let indicator = document.getElementById("currentCodeLine");
+  if (!indicator) {
+    indicator = document.createElement("span");
+    indicator.id = "currentCodeLine";
+    indicator.className = "current-code-line";
+    indicator.setAttribute("role", "status");
+    document.querySelector(".code-head").appendChild(indicator);
+  }
+  indicator.textContent = current == null ? "Ready" : `▶ Line ${current + 1}`;
+  const active = lines.querySelector('[aria-current="step"]');
+  if (active) {
+    const viewport = lines.closest(".code-window");
+    const rowTop = active.offsetTop - lines.offsetTop;
+    if (rowTop < viewport.scrollTop || rowTop + active.offsetHeight > viewport.scrollTop + viewport.clientHeight) viewport.scrollTop = Math.max(0, rowTop - viewport.clientHeight / 2);
+  }
 }
 
 function updateRunButton() {
   const button = document.getElementById("runMethod");
   if (algorithmMode !== "none") {
     const algorithm = getMethodDisplay();
+    if (["recursiveSum", "fibonacci"].includes(algorithmMode)) {
+      document.getElementById("runIcon").textContent = algorithm.icon;
+      document.getElementById("runLabel").textContent = stepSession ? "Walkthrough in progress" : algorithmState?.done ? "Replay walkthrough" : "Start full walkthrough";
+      button.disabled = Boolean(stepSession);
+      return;
+    }
     const directLabel = algorithmState?.done ? "Restart walkthrough" : algorithmMode === "twoPointers" ? "Compare pointers" : algorithmMode === "slidingWindow" ? "Slide window" : algorithmMode === "binarySearch" ? "Check midpoint" : algorithmMode === "recursiveSum" ? algorithmState?.phase === "return" ? "Return a frame" : "Call next node" : "Advance call tree";
     const label = stepSession ? "Walkthrough in progress" : stepMode ? `Walk through: ${directLabel}` : directLabel;
     document.getElementById("runIcon").textContent = algorithm.icon;
@@ -847,6 +1018,12 @@ function currentValue() {
 }
 
 function getOperationContext() {
+  const limit = getCollectionLimit();
+  if (["append", "prepend", "insert"].includes(selectedMethod) && list.length >= limit) {
+    const name = collectionMode === "list" ? "Linked list" : collectionMode === "stack" ? "Stack" : "Queue";
+    showToast(`${name} is full in this view (${limit} nodes). Remove a node before adding another.`);
+    return null;
+  }
   const selected = list.find(item => item.id === selectedId);
   const valueNeeded = ["append", "prepend", "insert", "find"].includes(selectedMethod);
   const value = valueNeeded ? currentValue() : undefined;
@@ -862,9 +1039,17 @@ function getOperationContext() {
   return { value, selectedId: selected?.id, selectedValue: selected?.value };
 }
 
+function getCollectionLimit() {
+  return 10;
+}
+
 function runSelectedMethod() {
   if (algorithmMode !== "none") {
     if (stepSession) return;
+    if (["recursiveSum", "fibonacci"].includes(algorithmMode)) {
+      startFullRecursiveWalkthrough();
+      return;
+    }
     if (stepMode) startAlgorithmStepSession();
     else runAlgorithm();
     return;
@@ -882,9 +1067,12 @@ function runAlgorithm() {
     configureAlgorithm();
     rebuildScene();
     updateRunButton();
+    renderCode();
     showToast("Algorithm walkthrough restarted.");
     return;
   }
+  const executionSteps = buildAlgorithmSteps();
+  renderCode(getMethodDisplay(), executionSteps.length ? [executionSteps.at(-1).line] : []);
   if (algorithmMode === "twoPointers") {
     const { left, right, target } = algorithmState;
     if (left >= right) {
@@ -1003,6 +1191,8 @@ function runAlgorithm() {
 }
 
 function executeOperation(context) {
+  const executionSteps = buildSteps(context);
+  renderCode(getMethodDisplay(), executionSteps.length ? [executionSteps.at(-1).line] : []);
   const selected = list.find(item => item.id === context.selectedId);
   const value = context.value;
   if (collectionMode === "stack") {
@@ -1219,6 +1409,74 @@ function buildAlgorithmSteps() {
   ];
 }
 
+function startFullRecursiveWalkthrough() {
+  configureAlgorithm();
+  setStepMode(true);
+  const steps = [];
+  const snapshot = (line, description) => steps.push({ line, description, state: structuredClone(algorithmState) });
+  if (algorithmMode === "recursiveSum") {
+    const array = isArrayAlgorithmView();
+    snapshot(0, `We will add ${list.map(node => node.value).join(" + ")}. Follow the calls down first, then watch the answers return. Use Next to begin.`);
+    list.forEach((node, index) => {
+      algorithmState.activeIndex = index;
+      algorithmState.index = index;
+      algorithmState.callStack.push(index);
+      snapshot(0, array ? `Call sumArray at index ${index}, where the value is ${node.value}. This call waits for the sum of the remaining values.` : `Call sumFrom at node ${node.value}. This call waits for the sum of the nodes after it.`);
+      snapshot(1, array ? `Index ${index} is below the length ${list.length}, so we have another value to add.` : `Node ${node.value} exists, so we have not reached the stopping point.`);
+      algorithmState.index = index + 1;
+      snapshot(2, array ? `Call again with index ${index + 1}. Keep ${node.value} waiting on the stack until that call returns.` : `Follow next from ${node.value} to ${list[index + 1]?.value ?? "null"}. Keep this call waiting on the stack.`);
+    });
+    algorithmState.phase = "return";
+    algorithmState.activeIndex = null;
+    algorithmState.returnIndex = list.length - 1;
+    snapshot(1, array ? `Index ${list.length} equals the array length. Stop here and return 0. Now the waiting calls can finish.` : "We reached null. Stop here and return 0. Now the waiting calls can finish.");
+    for (let index = list.length - 1; index >= 0; index--) {
+      const rest = algorithmState.total;
+      algorithmState.activeIndex = index;
+      algorithmState.total += list[index].value;
+      algorithmState.returns[index] = algorithmState.total;
+      algorithmState.callStack.pop();
+      algorithmState.returnIndex = index - 1;
+      algorithmState.done = index === 0;
+      snapshot(3, `${list[index].value} + ${rest} = ${algorithmState.total}. ${index === 0 ? `All calls have returned. The final sum is ${algorithmState.total}.` : `Return ${algorithmState.total} to the previous waiting call.`}`);
+    }
+  } else {
+    snapshot(0, "We will find Fibonacci(4). Each call needs the two smaller Fibonacci values. Next follows one call or return at a time.");
+    const frames = [];
+    algorithmState.events.forEach((event, index) => {
+      algorithmState.activeN = event.n;
+      algorithmState.lastEvent = event;
+      algorithmState.cursor = index + 1;
+      if (event.type === "call") {
+        frames.length = event.depth;
+        frames.push({ n: event.n, children: [] });
+        algorithmState.callStack = frames.map(frame => frame.n);
+        snapshot(0, `Enter Fibonacci(${event.n}). ${event.n < 2 ? "This is small enough to answer directly." : `It needs Fibonacci(${event.n - 1}) and Fibonacci(${event.n - 2}).`}`);
+        if (event.n >= 2) snapshot(2, `First solve Fibonacci(${event.n - 1}). Fibonacci(${event.n}) waits for this answer.`);
+      } else {
+        const frame = frames[event.depth];
+        algorithmState.done = index === algorithmState.events.length - 1;
+        snapshot(event.n < 2 ? 1 : 4, event.n < 2 ? `Base case: Fibonacci(${event.n}) returns ${event.value}. No more calls are needed here.` : `${frame.children[0]} + ${frame.children[1]} = ${event.value}. ${algorithmState.done ? "Fibonacci(4) is 3. The walkthrough is complete." : `Return ${event.value} to the waiting parent.`}`);
+        frames.length = event.depth;
+        const parent = frames.at(-1);
+        if (parent) {
+          parent.children.push(event.value);
+          if (parent.children.length === 1) {
+            algorithmState.activeN = parent.n;
+            algorithmState.callStack = frames.map(item => item.n);
+            snapshot(3, `Fibonacci(${parent.n}) has its first answer: ${event.value}. Now solve Fibonacci(${parent.n - 2}), the second branch.`);
+          }
+        }
+      }
+    });
+    steps.at(-1).state.callStack = [];
+  }
+  stepSession = { type: "fullAlgorithm", steps, current: 0 };
+  document.getElementById("stepper").hidden = false;
+  renderStepSession();
+  updateRunButton();
+}
+
 function startAlgorithmStepSession() {
   const steps = buildAlgorithmSteps();
   if (!steps.length) return;
@@ -1232,13 +1490,21 @@ function startAlgorithmStepSession() {
 function renderStepSession() {
   if (!stepSession) return;
   const step = stepSession.steps[stepSession.current];
+  if (stepSession.type === "fullAlgorithm") {
+    algorithmState = structuredClone(step.state);
+    selectedId = list[algorithmMode === "fibonacci" ? algorithmState.activeN : algorithmState.activeIndex]?.id || null;
+    rebuildScene();
+    document.getElementById("traceList").innerHTML = "";
+    stepSession.steps.slice(Math.max(0, stepSession.current - 3), stepSession.current + 1).forEach(item => trace(item.description, "find"));
+  }
   const isLast = stepSession.current === stepSession.steps.length - 1;
   document.getElementById("stepCount").textContent = `Step ${stepSession.current + 1} of ${stepSession.steps.length}`;
   document.getElementById("stepDescription").textContent = step.description;
   document.getElementById("previousStep").disabled = stepSession.current === 0;
-  const finalAction = stepSession.type === "algorithm" ? (algorithmState?.done ? "Restart walkthrough" : "Apply algorithm step") : selectedMethod === "find" ? "Confirm result" : "Apply change";
+  const finalAction = stepSession.type === "fullAlgorithm" ? "Finish walkthrough ✓" : stepSession.type === "algorithm" ? (algorithmState?.done ? "Restart walkthrough" : "Apply algorithm step") : selectedMethod === "find" ? "Confirm result" : "Apply change";
   document.getElementById("nextStep").textContent = isLast ? finalAction : "Next →";
   renderCode(getMethodDisplay(), [step.line]);
+  renderFlatScene();
 }
 
 function moveStep(direction) {
@@ -1257,9 +1523,13 @@ function moveStep(direction) {
     const session = stepSession;
     stepSession = null;
     document.getElementById("stepper").hidden = true;
-    if (session.type === "algorithm") runAlgorithm();
+    if (session.type === "fullAlgorithm") {
+      renderCode(getMethodDisplay(), [session.steps.at(-1).line]);
+      renderFlatScene();
+      showToast(algorithmMode === "fibonacci" ? "Fibonacci(4) = 3. You can replay the walkthrough." : "The sum is 19. You can replay the walkthrough.");
+    }
+    else if (session.type === "algorithm") runAlgorithm();
     else executeOperation(session.context);
-    renderCode(getMethodDisplay());
     updateRunButton();
   }
 }
@@ -1269,6 +1539,7 @@ function exitStepSession() {
   document.getElementById("stepper").hidden = true;
   renderCode(getMethodDisplay());
   updateRunButton();
+  renderFlatScene();
 }
 
 function setStepMode(enabled) {
@@ -1297,7 +1568,25 @@ function showToast(text) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove("show"), 2500);
 }
 
+function setLightTheme(enabled) {
+  document.body.classList.toggle("light-theme", enabled);
+  const button = document.getElementById("themeToggle");
+  const label = enabled ? "Switch to dark theme" : "Switch to light theme";
+  button.setAttribute("aria-label", label);
+  button.setAttribute("aria-pressed", String(enabled));
+  button.title = label;
+  document.querySelector('meta[name="theme-color"]').content = enabled ? "#f3f6fb" : "#09111f";
+  if (scene) scene.fog.color.set(enabled ? 0xeaf1fc : 0x0d1728);
+  try { localStorage.setItem("linklab-theme", enabled ? "light" : "dark"); } catch {}
+}
+document.getElementById("themeToggle").addEventListener("click", () => setLightTheme(!document.body.classList.contains("light-theme")));
 document.querySelectorAll(".method-button").forEach(button => button.addEventListener("click", () => selectMethod(button.dataset.method)));
+document.getElementById("compactView").addEventListener("click", () => setCompactView(true));
+document.getElementById("spatialView").addEventListener("click", () => setCompactView(false));
+document.getElementById("zoomIn").addEventListener("click", () => zoomCamera(.8));
+document.getElementById("zoomOut").addEventListener("click", () => zoomCamera(1.25));
+document.getElementById("fitScene").addEventListener("click", fitCamera);
+window.addEventListener("resize", renderFlatScene);
 document.getElementById("singleMode").addEventListener("click", () => setListMode("singly"));
 document.getElementById("doubleMode").addEventListener("click", () => setListMode("doubly"));
 document.getElementById("listPreset").addEventListener("click", () => setCollectionMode("list"));
@@ -1324,3 +1613,5 @@ document.getElementById("resetList").addEventListener("click", () => { if (stepS
 trace("<b>Initialized</b> the example list: 15 → 28 → 46 → 63.", "append");
 selectMethod("append");
 initScene();
+setCompactView(true);
+try { setLightTheme(localStorage.getItem("linklab-theme") === "light"); } catch {}

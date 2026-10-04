@@ -8,6 +8,8 @@ Open `index.html` in a current desktop browser with an internet connection. Thre
 
 ## Explore
 
+- **2D boxes** opens by default with animated nodes, step highlights, code, and execution trace together. **3D boxes** shows the original Three.js boxes and orbit controls in the same compact panel layout. The layout wraps longer sequences and respects reduced-motion preferences.
+
 - Drag the 3D scene to orbit; click any node to select it.
 - Use append, prepend, insert after, delete, find, and reverse.
 - Enable **Step-by-step mode** to pause on each linked-list or algorithm line, move back and forth, then apply that mutation or comparison.
